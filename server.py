@@ -1,10 +1,11 @@
-from http.server import HTTPServer, SimpleHTTPRequestHandler
+from http.server import HTTPServer, BaseHTTPRequestHandler
 import socket
 
+state = "off"
+
+
 def get_local_ip():
-    """Получает локальный IP-адрес компьютера"""
     try:
-        # Создаём временное соединение, чтобы узнать IP
         s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         s.connect(("8.8.8.8", 80))
         ip = s.getsockname()[0]
@@ -13,36 +14,77 @@ def get_local_ip():
     except:
         return "127.0.0.1"
 
-class Handler(SimpleHTTPRequestHandler):
+
+class Handler(BaseHTTPRequestHandler):
     def do_GET(self):
-        # Все запросы отдают index.html
-        self.path = '/index.html'
-        return SimpleHTTPRequestHandler.do_GET(self)
-    
+        global state
+
+        if self.path == "/on":
+            state = "on"
+        elif self.path == "/off":
+            state = "off"
+
+        background = "#2ecc71" if state == "on" else "#e74c3c"
+
+        html = f"""
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{state.upper()}</title>
+    <style>
+        body {{
+            min-height: 100vh;
+            margin: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background: {background};
+            font-family: Arial, sans-serif;
+        }}
+
+        .status {{
+            font-size: 25vw;
+            font-weight: 900;
+            color: white;
+            text-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            letter-spacing: 10px;
+        }}
+    </style>
+</head>
+<body>
+    <div class="status">{state.upper()}</div>
+</body>
+</html>
+"""
+
+        self.send_response(200)
+        self.send_header("Content-type", "text/html; charset=utf-8")
+        self.end_headers()
+        self.wfile.write(html.encode("utf-8"))
+
     def log_message(self, format, *args):
-        # Красивый вывод запросов в консоль
-        print(f"  📱 {args[0]}")
+        print(f"Запрос: {self.path}")
+
 
 PORT = 8000
 LOCAL_IP = get_local_ip()
 
-print('=' * 65)
-print(f'✅ СЕРВЕР ЗАПУЩЕН!')
-print('')
-print(f'📌 НА КОМПЬЮТЕРЕ (этот ноутбук):')
-print(f'   http://localhost:{PORT}')
-print('')
-print(f'📱 НА ТЕЛЕФОНЕ / ПЛАНШЕТЕ / ДРУГОМ КОМПЬЮТЕРЕ:')
-print(f'   http://{LOCAL_IP}:{PORT}')
-print('')
-print('=' * 65)
+print("=" * 65)
+print("СЕРВЕР ЗАПУЩЕН")
+print(f"На компьютере: http://localhost:{PORT}")
+print(f"На телефоне: http://{LOCAL_IP}:{PORT}")
+print("")
+print("Команды:")
+print(f"Включить:  http://localhost:{PORT}/on")
+print(f"Выключить: http://localhost:{PORT}/off")
+print("=" * 65)
 
-# Запускаем сервер на всех интерфейсах (чтобы был доступ с телефона)
-server = HTTPServer(('0.0.0.0', PORT), Handler)
+server = HTTPServer(("0.0.0.0", PORT), Handler)
 
 try:
     server.serve_forever()
 except KeyboardInterrupt:
-    print('')
-    print('🛑 Сервер остановлен')
+    print("Сервер остановлен")
     server.server_close()
